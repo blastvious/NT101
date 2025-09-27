@@ -122,6 +122,33 @@ void encrypt(string &str, vector<vector<char>> &keyT) {
 }
 
 
+void decrypt(string &str, vector<vector<char>> &keyT) {
+    int n = str.size();
+    vector<int> arr(4);
+
+    for (int i = 0; i < n; i += 2) {
+
+        Search(keyT, str[i], str[i + 1], arr);
+
+        if (arr[0] == arr[2]) {  
+         
+            str[i]     = keyT[arr[0]][(arr[1] + 4) % 5];
+            str[i + 1] = keyT[arr[0]][(arr[3] + 4) % 5];
+        }
+        else if (arr[1] == arr[3]) {  
+         
+            str[i]     = keyT[(arr[0] + 4) % 5][arr[1]];
+            str[i + 1] = keyT[(arr[2] + 4) % 5][arr[1]];
+        }
+        else {
+           
+            str[i]     = keyT[arr[0]][arr[3]];
+            str[i + 1] = keyT[arr[2]][arr[1]];
+        }
+    }
+}
+
+
 
 void encryptByPlayfairCipher(string &str, string &key) {
     vector<vector<char>> keyT;
@@ -132,17 +159,19 @@ void encryptByPlayfairCipher(string &str, string &key) {
     standardize(str);
     generateKeyTable(key, keyT);
     encrypt(str, keyT);
+    decrypt(str,keyT);
 }
 int main()
 {
 
 
     
-    string key = "nhomATM";
-    string str = "DH C NT H UI  T";
+    string key = "Harry Potter";
+    string str = "ARYWYPHCBVEBYGMPNCYGCNTDNCWTMGRMFTQPLEWTMLREFBEBQEBIYGBFLPHVOAEHKDHEUNGQFEROLEWTMLOPHEQGOSBEROQDWTLCMTHBWLNRKXRYLORYYPHCBVEBYRLGYDMKYGGWKLROANDBWGNERMNGYRLGHEWRTRLMBRHMUDGVODVTEGMCHLGWCMTFODNRRYCMZKODDUTDXGEOPOYRMFRMGUKXRYGHABROVTGQMCEHPRPEOTSEGEQLARYWYPOTMGQDOEXGOAUDHGUTULTNEHFTFHPGXGVPHGURBDMEGWKLETCBOTNTFQLTAEHMTUGEOAHEVEROXGVPHGDEWTEWGQIEDLPILERWPMOATNGQKQEAHBMVRFKBRMKLXODXFREBHMNUKXRYKLRMFLWDDNCN";
     cout << "Key text: " << key << endl;
     cout << "Plain text: " << str << endl;
     encryptByPlayfairCipher(str, key);
+    
     cout << "Cipher text: " << str << endl;
 
     return 0;
