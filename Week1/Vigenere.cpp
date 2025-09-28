@@ -84,10 +84,12 @@ void EncryptVigenere(string &plaintext, string &key)
     cout << "Original/ Decrypted Text: " << originalText(CypherText, keyStream);
 }
 
+
+
 int main()
 {
-    string str = "Dai hoc CN T T";
-    string keyword = "Nhom TH";
+    string str = "GE E KSFO RGEE   KS";
+    string keyword = "AYUSH";
     EncryptVigenere(str, keyword);
     return 0;
 }
