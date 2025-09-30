@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <limits>
 using namespace std;
 
 void toLowercase(string &s)
@@ -34,7 +35,7 @@ void generateKeyTable(string &key, vector<vector<char>> &TableKey)
     TableKey.resize(5, vector<char>(5, 0));
     vector<int> hash(26, 0);
 
-    int i, j, flag=0;
+    int i, j;
 
     for (i = 0; i < lengOfKey; i++)
     {
@@ -158,21 +159,110 @@ void encryptByPlayfairCipher(string &str, string &key) {
     removespace(str);
     standardize(str);
     generateKeyTable(key, keyT);
-    encrypt(str, keyT);
+    // encrypt(str, keyT);
     decrypt(str,keyT);
 }
+
+void InTable (vector<vector<char>> keyT){
+    for(int i = 0; i < 5; i++){
+        for(int j = 0; j < 5; j ++){
+            cout<<keyT[i][j]<<" ";
+        }
+        cout<<"\n";
+    }
+}
+
+
+void Menu (){
+    int luachon;
+    vector<vector<char>> keyT;
+    string plaintext = "", key = "", cipherstring="";
+    while (true)
+    {
+        system("cls");
+        cout<<"\n\n\t\t ================== Menu ==================";
+        cout<<"\n\t1. Nhap plaintext:";
+        cout<<"\n\t2. Nhap keyword";
+        cout<<"\n\t3. Tao key table matrix (5 x 5):";
+        cout<<"\n\t4. Encrypt:";
+        cout<<"\n\t5. DeCrypt:";
+        cout<<"\n\t6. Nhap cipher text: ";
+        cout<<"\n\t0. Ket thuc"; 
+        cout<<"\n\n\t\t ================== End ==================";
+        cout<<"\nNhap lua chon: ";
+        cin >> luachon;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n'); // bỏ enter thừa
+
+        switch (luachon)
+        {
+        case 0: 
+            return; // Thoát luôn hàm Menu
+
+        case 1:
+            cout<<"Nhap plaintext: ";
+            getline(cin, plaintext);
+            removespace(plaintext);
+            toLowercase(plaintext);
+            standardize(plaintext);
+            break;
+
+        case 2:
+            cout<<"Nhap keyword: ";
+            getline(cin, key);
+            removespace(key);
+            toLowercase(key);
+            break;
+
+        case 3:
+            generateKeyTable(key, keyT);
+            InTable(keyT);
+            break;
+
+        case 4:
+            cipherstring = plaintext;
+            encrypt(cipherstring,keyT);
+            
+            cout<<"Cipher text: "<<cipherstring<<"\n";
+            break;
+
+        case 5: 
+            decrypt(cipherstring, keyT);
+            cout<<"Original text: "<<plaintext<<"\n";
+            break;
+
+        case 6:
+            cout<<"Nhap ciphertext: ";
+            getline(cin, cipherstring);
+            removespace(cipherstring);
+            toLowercase(cipherstring);
+            break;
+
+        default:
+            cout << "Lua chon khong hop le!\n";
+            break;
+        }
+        system("pause"); // dừng để xem kết quả trước khi clear màn hình
+    }
+}
+
+
+
+
+
+
 int main()
 {
 
 
     
-    string key = "Harry Potter";
-    string str = "ARYWYPHCBVEBYGMPNCYGCNTDNCWTMGRMFTQPLEWTMLREFBEBQEBIYGBFLPHVOAEHKDHEUNGQFEROLEWTMLOPHEQGOSBEROQDWTLCMTHBWLNRKXRYLORYYPHCBVEBYRLGYDMKYGGWKLROANDBWGNERMNGYRLGHEWRTRLMBRHMUDGVODVTEGMCHLGWCMTFODNRRYCMZKODDUTDXGEOPOYRMFRMGUKXRYGHABROVTGQMCEHPRPEOTSEGEQLARYWYPOTMGQDOEXGOAUDHGUTULTNEHFTFHPGXGVPHGURBDMEGWKLETCBOTNTFQLTAEHMTUGEOAHEVEROXGVPHGDEWTEWGQIEDLPILERWPMOATNGQKQEAHBMVRFKBRMKLXODXFREBHMNUKXRYKLRMFLWDDNCN";
-    cout << "Key text: " << key << endl;
-    cout << "Plain text: " << str << endl;
-    encryptByPlayfairCipher(str, key);
+    // string key = "Harry Potter";
+    // string str = "ARYWYPHCBVEBYGMPNCYGCNTDNCWTMGRMFTQPLEWTMLREFBEBQEBIYGBFLPHVOAEHKDHEUNGQFEROLEWTMLOPHEQGOSBEROQDWTLCMTHBWLNRKXRYLORYYPHCBVEBYRLGYDMKYGGWKLROANDBWGNERMNGYRLGHEWRTRLMBRHMUDGVODVTEGMCHLGWCMTFODNRRYCMZKODDUTDXGEOPOYRMFRMGUKXRYGHABROVTGQMCEHPRPEOTSEGEQLARYWYPOTMGQDOEXGOAUDHGUTULTNEHFTFHPGXGVPHGURBDMEGWKLETCBOTNTFQLTAEHMTUGEOAHEVEROXGVPHGDEWTEWGQIEDLPILERWPMOATNGQKQEAHBMVRFKBRMKLXODXFREBHMNUKXRYKLRMFLWDDNCN";
+    // cout << "Key text: " << key << endl;
+    // cout << "Plain text: " << str << endl;
+    // encryptByPlayfairCipher(str, key);
     
-    cout << "Cipher text: " << str << endl;
-
+    // cout << "Cipher text: " << str << endl;
+    Menu();
+    system("pause");
     return 0;
 }
