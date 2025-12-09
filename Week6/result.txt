@@ -1,3 +1,0 @@
-Key: 4
-Plaintext: 
-ATTACKATONCE

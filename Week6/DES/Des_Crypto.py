@@ -1,5 +1,6 @@
 import base64
-
+import os
+import random
 # =========================
 #  Helper Functions
 # =========================
@@ -27,6 +28,7 @@ def permute(block, table):
 
 def shift_left(k, n):
     return k[n:] + k[:n]
+
 
 # =========================
 # DES Tables
@@ -113,6 +115,8 @@ SBOX = [
    [2,1,14,7,4,10,8,13,15,12,9,0,3,5,6,11]]
 ]
 
+#I'm Daniel Tuanna create at 8:57 pm 11/28/2025 
+
 # P-Box
 P = [16, 7, 20, 21, 29, 12, 28, 17,
      1, 15, 23, 26, 5, 18, 31, 10,
@@ -128,6 +132,7 @@ PC1 = [57, 49, 41, 33, 25, 17, 9,
        7, 62, 54, 46, 38, 30, 22,
        14, 6, 61, 53, 45, 37, 29,
        21, 13, 5, 28, 20, 12, 4]
+
 
 PC2 = [14,17,11,24,1,5,
        3,28,15,6,21,10,
@@ -149,22 +154,15 @@ def generate_round_keys(key64_bits):
     key56 = permute(key64_bits, PC1)
     C, D = key56[:28], key56[28:]
     round_keys = []
-
     for shift in SHIFT:
         C = shift_left(C, shift)
         D = shift_left(D, shift)
         round_keys.append(permute(C + D, PC2))
-
     return round_keys
-
-# ==================================================
-# DES Round Function
-# ==================================================
 
 def f(right32, key48):
     expanded = permute(right32, E)
     xored = ''.join('1' if expanded[i] != key48[i] else '0' for i in range(48))
-
     s_out = ""
     for i in range(8):
         block6 = xored[i*6:(i+1)*6]
@@ -172,62 +170,76 @@ def f(right32, key48):
         col = int(block6[1:5], 2)
         s_val = SBOX[i][row][col]
         s_out += f"{s_val:04b}"
-
     return permute(s_out, P)
-
-# ==================================================
-# DES Encrypt/Decrypt single block
-# ==================================================
 
 def des_block_encrypt(block64, round_keys):
     block = permute(block64, IP)
     L, R = block[:32], block[32:]
-
     for i in range(16):
         newR = ''.join('1' if L[j] != f(R, round_keys[i])[j] else '0' for j in range(32))
         L = R
         R = newR
-
-    combined = R + L  # Swap
+    combined = R + L
     return permute(combined, FP)
 
 def des_block_decrypt(block64, round_keys):
     return des_block_encrypt(block64, round_keys[::-1])
 
+
+
 # ==================================================
-# Padding (PKCS#5)
+# Padding (PKCS#7)
 # ==================================================
 
-def pad(data: bytes):
-    pad_len = 8 - (len(data) % 8)
+def pad(data: bytes, block_size=8):
+    pad_len = block_size - (len(data) % block_size)
     return data + bytes([pad_len] * pad_len)
 
 def unpad(data: bytes):
+    if not data:
+        raise ValueError("Cannot unpad empty data")
     pad_len = data[-1]
-    return data[:-pad_len]
+    
+    if pad_len == 0 or pad_len > len(data):
+        raise ValueError("Invalid padding")
 
-# ==================================================
-# Modes: ECB, CBC, CFB, OFB
-# ==================================================
+
+    if all(data[i] == pad_len for i in range(len(data) - pad_len, len(data))):
+        return data[:-pad_len]
+    else:
+        raise ValueError("Invalid padding detected (non-uniform bytes)")
 
 def des_encrypt(plaintext: bytes, key: bytes, mode='ECB', iv=None, output='hex'):
     key_bits = bytes_to_bitstring(key)
     round_keys = generate_round_keys(key_bits)
 
+    # 🎯 START: LOGIC TẠO IV (Thay đổi này)
+    # Tạo IV ngẫu nhiên nếu cần
+    if mode in ['CBC', 'CFB', 'OFB']:
+        if iv is None:
+            # os.urandom tạo byte ngẫu nhiên an toàn (8 bytes cho DES)
+            iv = os.urandom(8) 
+            # Giữ lại biến iv_generated để biết IV có được tạo mới hay không
+            iv_generated = True
+        else:
+            iv_generated = False
+    # 🎯 END: LOGIC TẠO IV
+    
     pt = pad(plaintext)
     blocks = [pt[i:i+8] for i in range(0, len(pt), 8)]
     result = b''
 
     if mode == 'ECB':
+        # ... (code ECB cũ)
         for b in blocks:
             b_bits = bytes_to_bitstring(b)
             enc = des_block_encrypt(b_bits, round_keys)
             result += bitstring_to_bytes(enc)
 
     elif mode == 'CBC':
-        if iv is None:
-            raise ValueError("IV is required for CBC")
+        # BỎ ĐI: if iv is None: raise ValueError("IV is required for CBC")
         prev = iv
+        # ... (code CBC cũ)
         for b in blocks:
             x = bytes(a ^ c for a, c in zip(b, prev))
             enc = des_block_encrypt(bytes_to_bitstring(x), round_keys)
@@ -236,9 +248,9 @@ def des_encrypt(plaintext: bytes, key: bytes, mode='ECB', iv=None, output='hex')
             prev = r
 
     elif mode == 'CFB':
-        if iv is None:
-            raise ValueError("IV is required for CFB")
+        # BỎ ĐI: if iv is None: raise ValueError("IV is required for CFB")
         prev = iv
+        # ... (code CFB cũ)
         for b in blocks:
             out = des_block_encrypt(bytes_to_bitstring(prev), round_keys)
             out_bytes = bitstring_to_bytes(out)
@@ -247,9 +259,9 @@ def des_encrypt(plaintext: bytes, key: bytes, mode='ECB', iv=None, output='hex')
             prev = r
 
     elif mode == 'OFB':
-        if iv is None:
-            raise ValueError("IV is required for OFB")
+
         prev = iv
+
         for b in blocks:
             out = des_block_encrypt(bytes_to_bitstring(prev), round_keys)
             out_bytes = bitstring_to_bytes(out)
@@ -258,16 +270,25 @@ def des_encrypt(plaintext: bytes, key: bytes, mode='ECB', iv=None, output='hex')
             prev = out_bytes
 
     if output == 'hex':
-        return result.hex().upper()
+        ciphertext = result.hex().upper()
     elif output == 'base64':
-        return base64_encode(result)
+        ciphertext = base64_encode(result)
+
+    if mode in ['CBC', 'CFB', 'OFB'] and iv_generated:
+
+        return ciphertext, iv 
+    else:
+
+        return ciphertext
 
 def des_decrypt(ciphertext: str, key: bytes, mode='ECB', iv=None, input='hex'):
     if input == 'hex':
         data = bytes.fromhex(ciphertext)
     else:
         data = base64_decode(ciphertext)
-
+    if mode in ['CBC', 'CFB', 'OFB'] and iv is None:
+        raise ValueError(f"IV là tham số bắt buộc để giải mã trong chế độ {mode}.")
+    
     key_bits = bytes_to_bitstring(key)
     round_keys = generate_round_keys(key_bits)
 
@@ -290,44 +311,34 @@ def des_decrypt(ciphertext: str, key: bytes, mode='ECB', iv=None, input='hex'):
             result += r
             prev = b
 
-    elif mode == 'CFB':
-        if iv is None:
-            raise ValueError("IV is required for CFB")
-        prev = iv
-        for b in blocks:
-            out = des_block_encrypt(bytes_to_bitstring(prev), round_keys)
-            out_bytes = bitstring_to_bytes(out)
-            r = bytes(a ^ c for a, c in zip(out_bytes, b))
-            result += r
-            prev = b
-
-    elif mode == 'OFB':
-        if iv is None:
-            raise ValueError("IV is required for OFB")
-        prev = iv
-        for b in blocks:
-            out = des_block_encrypt(bytes_to_bitstring(prev), round_keys)
-            out_bytes = bitstring_to_bytes(out)
-            r = bytes(a ^ c for a, c in zip(out_bytes, b))
-            result += r
-            prev = out_bytes
-
     return unpad(result)
 
 
 pt = b"HELLO WORLD"
 key = b"\x13\x34\x57\x79\x9B\xBC\xDF\xF1"
 iv  = b"\x01\x23\x45\x67\x89\xAB\xCD\xEF"
+try:
+    result_tuple = des_encrypt(pt, key, mode='CBC', iv=None, output='hex')
+    if isinstance(result_tuple, tuple):
+        cipher, new_iv = result_tuple
+        print(f"\n--- CBC (IV Tự Động Tạo) ---")
+        print(f"Cipher: {cipher}")
+        print(f"IV Mới (Bytes): {new_iv}")
+        
 
-cipher = des_encrypt(pt, key, mode='CBC', iv=iv, output='hex')
-print(cipher)
+        plain = des_decrypt(cipher, key, mode='CBC', iv=new_iv, input='hex')
+        print(f"Plain: {plain}")
+    else:
 
-plain = des_decrypt(cipher, key, mode='CBC', iv=iv, input='hex')
-print(plain)
+        cipher = result_tuple
+        print(f"Cipher ECB: {cipher}")
+        
+except ValueError as e:
+    print(f"Lỗi: {e}")
 
+cipherA = des_encrypt(pt, key, mode='ECB', iv=None, output='hex') 
+print(f"\n--- ECB ---")
+print(f"CipherA: {cipherA}")
 
-cipherA = des_encrypt(pt, key, mode='ECB', iv=iv, output='hex')
-print(cipherA)
-
-plainA = des_decrypt(cipherA, key, mode='ECB', iv=iv, input='hex')
-print(plainA)
+plainA = des_decrypt(cipherA, key, mode='ECB', iv=None, input='hex')
+print(f"PlainA: {plainA}")
