@@ -1,3 +1,8 @@
+###############################
+# Nguyen Anh Tuan 23521717
+# DES_crypto.py
+# repo: https://github.com/blastvious/NT101
+###############################
 import base64
 import os
 import random
