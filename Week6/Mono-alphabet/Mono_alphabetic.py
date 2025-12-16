@@ -11,10 +11,18 @@ import time
 import string
 import re
 
-
+from collections import Counter
 
 ALPHABET = string.ascii_uppercase
 ALPHABET_SIZE = 26
+
+ENGLISH_LETTER_FREQ = {
+    'E': 12.7, 'T': 9.1, 'A': 8.2, 'O': 7.5, 'I': 7.0, 'N': 6.7,
+    'S': 6.3, 'H': 6.1, 'R': 6.0, 'D': 4.3, 'L': 4.0,
+    'C': 2.8, 'U': 2.8, 'M': 2.4, 'W': 2.4, 'F': 2.2,
+    'G': 2.0, 'Y': 2.0, 'P': 1.9, 'B': 1.5, 'V': 1.0,
+    'K': 0.8, 'X': 0.2, 'J': 0.15, 'Q': 0.1, 'Z': 0.07
+}
 
 COMMON_WORDS = {
     "the", "of", "and", "to", "in", "a", "is", "that", "for", "it", 
@@ -22,7 +30,7 @@ COMMON_WORDS = {
     "are", "or", "his", "from", "at", "which", "but", "have", "an", 
     "had", "they", "you", "were", "their", "one", "all", "we", "can", 
     "her", "has", "there", "been", "if", "more", "when", "will", 
-    "would", "who", "so", "no"
+    "would", "who", "so", "no",
 }
 
 
@@ -36,7 +44,7 @@ TRIGRAM_DATA_LIST = [
     "HAT", "THA", "ERE", "ATE", "HIS", "CON", "RES", "VER", "ALL", "ONS",
     "NCE", "MEN", "ITH", "TED", "ERS", "PRO", "THI", "WIT", "ARE", "ESS",
     "NOT", "IVE", "WAS", "ECT", "REA", "COM", "EVE", "PER", "INT", "EST",
-    "STA", "CTI", "ICA", "IST", "EAR", "AIN", "ONE", "OUR", "ITI", "RAT"
+    "STA", "CTI", "ICA", "IST", "EAR", "AIN", "ONE", "OUR", "ITI", "RAT", 
 ]
 
 #Normalize data 2gram
@@ -46,7 +54,7 @@ for pair, prob_str in pairs:
     prob = float(prob_str) / 100 
     ENGLISH_2GRAM_LOGPROB[pair] = math.log(prob)
 
-#Normalize data 2gram
+#Normalize data 3gram
 ENGLISH_3GRAM_LOGPROB = {}
 high_prob_3gram = 0.005 # Xác suất cao cho 3-gram phổ biến (0.5%)
 low_prob_3gram = 0.0001 # Xác suất thấp cho 3-gram hiếm (0.01%)
@@ -57,7 +65,27 @@ for tri in TRIGRAM_DATA_LIST:
 # Log-Likelihood mặc định cho các N-gram không có trong danh sách
 default_log_prob = math.log(low_prob_3gram) 
 
+def initialize_frequency_mapping(ciphertext):
+    counter = Counter(ciphertext)
+    cipher_sorted = [c for c, _ in counter.most_common()]
+    english_sorted = sorted(
+        ENGLISH_LETTER_FREQ,
+        key=ENGLISH_LETTER_FREQ.get,
+        reverse=True
+    )
 
+    mapping = {}
+    for c, p in zip(cipher_sorted, english_sorted):
+        mapping[c] = p
+
+    remaining_p = [c for c in ALPHABET if c not in mapping.values()]
+    remaining_c = [c for c in ALPHABET if c not in mapping]
+    random.shuffle(remaining_p)
+
+    for c, p in zip(remaining_c, remaining_p):
+        mapping[c] = p
+
+    return mapping
 # --- ANALYZE SUPPORT FUNTION ---
 
 def preprocess_cipher(file_path):
@@ -90,38 +118,61 @@ def initialize_random_mapping():
     return mapping
 
 def generate_neighbor_mapping(mapping):
-    new_mapping = mapping.copy()
-    char1, char2 = random.sample(ALPHABET, 2)
-    new_mapping[char1], new_mapping[char2] = new_mapping[char2], new_mapping[char1]
-    return new_mapping
+    new = mapping.copy()
+    r = random.random()
 
-def calculate_fitness(plaintext_alpha):
+    if r < 0.4:
+        # random swap
+        c1, c2 = random.sample(ALPHABET, 2)
+        new[c1], new[c2] = new[c2], new[c1]
 
-    score = 0
-    N = len(plaintext_alpha)
-    if N < 3: return -float('inf')
+    elif r < 0.7:
+        # frequency-guided swap (FIXED)
+        group = random.choice(["ETAOIN", "SHRDLC", "UMWFGY", "PBVKJXQZ"])
+        cipher_candidates = [c for c, p in new.items() if p in group]
+        if len(cipher_candidates) >= 2:
+            c1, c2 = random.sample(cipher_candidates, 2)
+            new[c1], new[c2] = new[c2], new[c1]
 
-    W_2GRAM = 0.4
-    W_3GRAM = 0.6
-    
-    #  2-gram Score
-    score_2gram = 0
+    else:
+        # block move
+        chars = random.sample(ALPHABET, 4)
+        values = [new[c] for c in chars]
+        random.shuffle(values)
+        for c, v in zip(chars, values):
+            new[c] = v
+
+    return new
+
+
+def calculate_fitness(plaintext, phase):
+    plaintext = get_cipher_only(plaintext)
+    if phase == 1:
+        W_2, W_3, W_F = 0.4, 0.4, 0.2
+    else:
+        W_2, W_3, W_F = 0.2, 0.7, 0.1
+
+    score_2, score_3 = 0, 0
+    N = len(plaintext)
+
     for i in range(N - 1):
-        bigram = plaintext_alpha[i:i+2]
-        log_prob = ENGLISH_2GRAM_LOGPROB.get(bigram, default_log_prob)
-        score_2gram += log_prob
-    
-    # 3-gram Score
-    score_3gram = 0
-    for i in range(N - 2):
-        trigram = plaintext_alpha[i:i+3]
-        log_prob = ENGLISH_3GRAM_LOGPROB.get(trigram, default_log_prob)
-        score_3gram += log_prob
+        score_2 += ENGLISH_2GRAM_LOGPROB.get(
+            plaintext[i:i+2], default_log_prob
+        )
 
-    
-    total_score = (W_2GRAM * score_2gram) + (W_3GRAM * score_3gram)
-    
-    return total_score / N 
+    for i in range(N - 2):
+        score_3 += ENGLISH_3GRAM_LOGPROB.get(
+            plaintext[i:i+3], default_log_prob
+        )
+
+    return (
+        W_2 * score_2 +
+        W_3 * score_3 +
+        W_F * letter_freq_penalty(plaintext)
+    )
+
+
+
 
 def validate_plaintext_with_words(plaintext_with_spaces, common_words_set):
     plaintext_alpha = get_cipher_only(plaintext_with_spaces).lower() 
@@ -135,47 +186,126 @@ def validate_plaintext_with_words(plaintext_with_spaces, common_words_set):
 
     return match_count / total_length
 
+def letter_freq_penalty(plaintext):
+    from collections import Counter
+    counter = Counter(plaintext)
+    total = sum(counter.values())
+
+    penalty = 0
+    for c in ALPHABET:
+        observed = counter.get(c, 0) / total
+        expected = ENGLISH_LETTER_FREQ[c] / 100
+        penalty += abs(observed - expected)
+
+    return -50 * penalty
+
+
 # ---  ALGORITHM SIMULATED ANNEALING  ---
 
-def simulated_annealing_cracker(ciphertext_alpha, max_iterations=500000, initial_temp=10.0, cooling_rate=0.9999):
-    
-    current_mapping = initialize_random_mapping()
-    current_plaintext = apply_mapping(ciphertext_alpha, current_mapping)
-    current_score = calculate_fitness(current_plaintext)
-    
-    best_mapping = current_mapping
-    best_score = current_score
-    temp = initial_temp
-    
-    print(f"\nBắt đầu SA | Điểm Khởi tạo: {best_score:.4f}")
-    
-    for iteration in range(max_iterations):
-        temp *= cooling_rate
-        
-        neighbor_mapping = generate_neighbor_mapping(current_mapping)
-        neighbor_plaintext = apply_mapping(ciphertext_alpha, neighbor_mapping)
-        neighbor_score = calculate_fitness(neighbor_plaintext)
-        
-        delta_score = neighbor_score - current_score
-        
-        if delta_score > 0:
-            current_mapping = neighbor_mapping
-            current_score = neighbor_score
-            
-            if current_score > best_score:
-                best_score = current_score
-                best_mapping = current_mapping.copy()
-        
-        elif temp > 0:
-            acceptance_prob = math.exp(delta_score / temp)
-            if random.random() < acceptance_prob:
-                current_mapping = neighbor_mapping
-                current_score = neighbor_score
-        
-        if iteration % 50000 == 0 and iteration > 0:
-            print(f"Lặp {iteration} | Nhiệt độ: {temp:.6f} | Điểm Tốt nhất: {best_score:.4f}")
 
-    return best_mapping, best_score
+def simulated_annealing_cracker(ciphertext, max_iter, temp, cooling, phase,init_mapping=None):
+    mapping = init_mapping if init_mapping else initialize_frequency_mapping(ciphertext)
+    plaintext = apply_mapping(ciphertext, mapping)
+    score = calculate_fitness(plaintext, phase)
+
+    best_map = mapping.copy()
+    best_score = score
+
+    stagnant = 0
+   
+
+    for i in range(max_iter):
+        temp *= cooling
+        neighbor = generate_neighbor_mapping(mapping)
+        new_plain = apply_mapping(ciphertext, neighbor)
+        new_score = calculate_fitness(new_plain, phase)
+
+        delta = new_score - score
+        if i % 50000 == 0 and i > 0:
+            if best_score - score < 1e-4:
+                break
+
+        if delta > 0 or (temp > 1e-6 and random.random() < math.exp(delta / temp)):
+            mapping = neighbor
+            score = new_score
+            stagnant = 0
+
+            if score > best_score:
+                best_map = mapping.copy()
+                best_score = score
+        else:
+            stagnant += 1
+
+        # Escape local optimum
+        if stagnant > 20000:
+            fixed = list("ETAOIN")
+            shuffled = [c for c in ALPHABET if c not in fixed]
+            random.shuffle(shuffled)
+
+            new_map = {}
+            for c in fixed:
+                new_map[c] = mapping[c]
+            remaining_plain = [mapping[c] for c in shuffled]
+            random.shuffle(remaining_plain)
+            for c, p in zip(shuffled, shuffled):
+                new_map[c] = p
+
+            mapping = new_map
+            stagnant = 0
+
+    return best_map, best_score
+
+
+def local_refinement(mapping, ciphertext, steps=5000):
+    best_map = mapping
+    best_score = calculate_fitness(apply_mapping(ciphertext, mapping), phase=2)
+
+    for _ in range(steps):
+        new_map = generate_neighbor_mapping(best_map)
+        score = calculate_fitness(apply_mapping(ciphertext, new_map),phase=2)
+        if score > best_score:
+            best_map = new_map
+            best_score = score
+
+    return best_map
+
+
+def crack_with_restarts(ciphertext, restarts=8):
+    global_best_map = None
+    global_best_score = -float('inf')
+
+    for r in range(restarts):
+        print(f"--- Restart {r+1}/{restarts} ---")
+
+        # Phase 1: Exploration
+        map1, _ = simulated_annealing_cracker(
+            ciphertext,
+            max_iter=150000,
+            temp=15.0,
+            cooling=0.9995,
+            phase=1
+        )
+
+        # Phase 2: Exploitation
+        map2, score2 = simulated_annealing_cracker(
+            ciphertext,
+            max_iter=200000,
+            temp=5.0,
+            cooling=0.9998,
+            phase=2,
+            init_mapping=map1
+        )
+
+        # Hill climbing
+        map2 = local_refinement(map2, ciphertext, steps=5000)
+        final_score = calculate_fitness(apply_mapping(ciphertext, map2),phase=2)
+
+        if final_score > global_best_score:
+            global_best_map = map2
+            global_best_score = final_score
+
+    return global_best_map, global_best_score
+
 
 # --- MAIN FUNTION AND EXCUTE ---
 
@@ -197,13 +327,11 @@ def main_program(input_file_path, output_file_path):
     
     # Simulated Annealing
     start_time = time.time()
-    best_mapping, final_score = simulated_annealing_cracker(
-        ciphertext_alpha, 
-        max_iterations=500000, 
-        initial_temp=10.0 
-    )
+    best_mapping, final_score = crack_with_restarts(ciphertext_alpha)
     end_time = time.time()
-    
+    best_mapping = local_refinement(best_mapping, ciphertext_alpha)
+    final_score = calculate_fitness(apply_mapping(ciphertext_alpha, best_mapping),phase=2)
+
     print(f"\n--- QUÁ TRÌNH HOÀN THÀNH ---")
     print(f"Thời gian chạy: {end_time - start_time:.2f} giây")
 

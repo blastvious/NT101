@@ -1,3 +1,12 @@
-Key: 7
+Key: 19
 Plaintext:
-If he had anything confidential to say, he wrote it in cipher, that is, by so changing the order of the letters of the alphabet, that not a word could be made out
+The UIT is a leading institution under VNU-HCM, specializing in the 
+field of information technology. Established with a mission to foster 
+innovation and excellence in IT education and research, UIT offers a 
+wide range of undergraduate and postgraduate programs aimed at producing 
+highly skilled professionals. The university is recognized for its 
+cutting-edge research in areas like cybersecurity, artificial 
+intelligence, and software engineering. With state-of-the-art 
+facilities and a strong emphasis on collaboration with industry, UIT 
+equips students with both theoretical knowledge and practical skills to 
+thrive in the rapidly evolving tech industry.

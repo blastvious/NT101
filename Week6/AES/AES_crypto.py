@@ -214,14 +214,16 @@ def aes_decrypt_block(data: bytes, expanded_keys: list[bytes], Nr: int) -> bytes
     """Thực hiện Giải mã AES cho 1 khối 16 byte."""
     state = bytes_to_state(data)
     
+    # Vòng cuối (AddRoundKey Nr)
     state = add_round_key(state, expanded_keys[Nr])
     
+    # Các vòng giữa (r = Nr-1 đến 1)
     for r in range(Nr - 1, 0, -1):
         state = inv_shift_rows(state)
         state = sub_bytes(state, INV_S_BOX)
-        # Thay đổi thứ tự: Đưa InvMixColumns lên trước
-        state = inv_mix_columns(state)
-        state = add_round_key(state, expanded_keys[r]) 
+        
+        state = add_round_key(state, expanded_keys[r]) # 1. AddRoundKey
+        state = inv_mix_columns(state)               # 2. InvMixColumns
         
     state = inv_shift_rows(state)
     state = sub_bytes(state, INV_S_BOX)
@@ -232,12 +234,10 @@ def aes_decrypt_block(data: bytes, expanded_keys: list[bytes], Nr: int) -> bytes
 ## --- PADDING VÀ CHẾ ĐỘ HOẠT ĐỘNG ---
 
 def pkcs7_pad(data: bytes) -> bytes:
-    """PKCS#7 Padding."""
     padding_len = BLOCK_SIZE - (len(data) % BLOCK_SIZE)
     return data + bytes([padding_len] * padding_len)
 
 def pkcs7_unpad(data: bytes) -> bytes:
-    """PKCS#7 Unpadding (Đã sửa)."""
     if not data: 
         return b''
         
